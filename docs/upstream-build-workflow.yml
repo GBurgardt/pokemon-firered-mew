@@ -1,3 +1,4 @@
+# Upstream reference only: matching-ROM CI is not enabled for this modified build.
 name: CI
 
 on:
