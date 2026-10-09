@@ -68,3 +68,5 @@ build-cmake-*/
 CMakeLists.txt
 compile_commands.json
 .porydaw/
+build-release/
+build-lab/

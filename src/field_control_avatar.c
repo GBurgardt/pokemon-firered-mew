@@ -1,4 +1,5 @@
 #include "global.h"
+#include "mew_encounter.h"
 #include "gflib.h"
 #include "bike.h"
 #include "coord_event_weather.h"
@@ -196,6 +197,9 @@ int ProcessPlayerFieldInput(struct FieldInput *input)
     u8 playerDirection;
     u16 metatileBehavior;
     u32 metatileAttributes;
+
+    if (input->pressedAButton && MewEncounter_TryInteract())
+        return TRUE;
 
     ResetFacingNpcOrSignpostVars();
     playerDirection = GetPlayerFacingDirection();

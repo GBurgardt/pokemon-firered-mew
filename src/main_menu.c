@@ -155,7 +155,11 @@ static void VBlankCB_MainMenu(void)
 
 void CB2_InitMainMenu(void)
 {
+#ifdef MEW_LAB
+    SetMainCallback2(CB2_NewGame);
+#else
     MainMenuGpuInit(1);
+#endif
 }
 
 static void CB2_InitMainMenu_2(void)

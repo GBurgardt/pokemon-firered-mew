@@ -3,6 +3,50 @@ SSAnne_Exterior_MapScripts::
 	map_script MAP_SCRIPT_ON_FRAME_TABLE, SSAnne_Exterior_OnFrame
 	.byte 0
 
+MewTruck_EventScript::
+	lockall
+	msgbox MewTruck_Text_Strength, MSGBOX_DEFAULT
+	closemessage
+	special MewEncounter_Start
+	waitstate
+	msgbox gStringVar4, MSGBOX_DEFAULT
+	goto_if_eq VAR_RESULT, TRUE, EventScript_FieldWhiteOut
+	releaseall
+	end
+
+MewTruck_HintScript::
+	lockall
+	msgbox MewTruck_Text_Hint, MSGBOX_DEFAULT
+	releaseall
+	end
+
+MewTruck_ReturnToCity::
+	lock
+	faceplayer
+	msgbox MewTruck_ReturnText, MSGBOX_YESNO
+	goto_if_eq VAR_RESULT, NO, EventScript_ReleaseEnd
+	closemessage
+	warp MAP_VERMILION_CITY, 23, 34
+	waitstate
+	release
+	end
+
+MewTruck_ReturnText:
+	.string "Heading back to VERMILION CITY?\n"
+	.string "I'll take you across.$"
+
+MewTruck_Text_Strength:
+	.string "The truck won't budge...\n"
+	.string "Something underneath taps back.\p"
+	.string "Maybe it doesn't need more strength.\n"
+	.string "You play the POKé FLUTE.$"
+
+MewTruck_Text_Hint:
+	.string "An old truck. Something is asleep\n"
+	.string "underneath...\p"
+	.string "Bring STRENGTH and a POKé FLUTE.\n"
+	.string "Maybe a familiar melody will help.$"
+
 SSAnne_Exterior_OnTransition::
 	setworldmapflag FLAG_WORLD_MAP_SSANNE_EXTERIOR
 	end

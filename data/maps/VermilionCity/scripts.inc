@@ -36,10 +36,28 @@ VermilionCity_EventScript_Woman::
 VermilionCity_EventScript_OldMan1::
 	lock
 	faceplayer
+	goto_if_set FLAG_BADGE05_GET, VermilionCity_MewPierChoice
+VermilionCity_OldManNormal::
 	goto_if_eq VAR_MAP_SCENE_VERMILION_CITY, 3, VermilionCity_EventScript_OldMan1SSAnneLeft
 	msgbox VermilionCity_Text_DidYouSeeSSAnneInHarbor
 	release
 	end
+
+VermilionCity_MewPierChoice::
+	msgbox VermilionCity_MewPierText, MSGBOX_YESNO
+	goto_if_eq VAR_RESULT, NO, VermilionCity_OldManNormal
+	closemessage
+	warp MAP_SSANNE_EXTERIOR, 58, 8
+	waitstate
+	release
+	end
+
+VermilionCity_MewPierText:
+	.string "I hear tapping beneath the truck\n"
+	.string "at the old service pier.\p"
+	.string "Maybe a familiar melody could wake\n"
+	.string "whatever is sleeping there...\p"
+	.string "Shall I show you the way?$"
 
 VermilionCity_EventScript_OldMan1SSAnneLeft::
 	msgbox VermilionCity_Text_SSAnneHasDepartedForYear

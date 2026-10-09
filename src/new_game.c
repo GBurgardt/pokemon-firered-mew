@@ -29,9 +29,15 @@
 #include "berry_powder.h"
 #include "pokemon_jump.h"
 #include "event_scripts.h"
+#include "constants/species.h"
+#include "constants/items.h"
+#include "constants/moves.h"
 
 // this file's functions
 static void ResetMiniGamesResults(void);
+#ifdef MEW_LAB
+static const u8 sMewLabName[] = _("RED");
+#endif
 
 // EWRAM vars
 EWRAM_DATA bool8 gDifferentSaveFile = FALSE;
@@ -81,7 +87,11 @@ static void ClearBattleTower(void)
 
 static void WarpToPlayersRoom(void)
 {
+#ifdef MEW_LAB
+    SetWarpDestination(MAP_GROUP(MAP_SSANNE_EXTERIOR), MAP_NUM(MAP_SSANNE_EXTERIOR), -1, 58, 8);
+#else
     SetWarpDestination(MAP_GROUP(MAP_PALLET_TOWN_PLAYERS_HOUSE_2F), MAP_NUM(MAP_PALLET_TOWN_PLAYERS_HOUSE_2F), -1, 6, 6);
+#endif
     WarpIntoMap();
 }
 
@@ -108,6 +118,11 @@ void NewGameInitData(void)
 {
     u8 rivalName[PLAYER_NAME_LENGTH + 1];
 
+#ifdef MEW_LAB
+    SetSaveBlocksPointers();
+    Sav2_ClearSetDefault();
+    StringCopy(gSaveBlock1Ptr->rivalName, sMewLabName);
+#endif
     StringCopy(rivalName, gSaveBlock1Ptr->rivalName);
     gDifferentSaveFile = TRUE;
     gSaveBlock2Ptr->encryptionKey = 0;
@@ -149,6 +164,22 @@ void NewGameInitData(void)
     RunScriptImmediately(EventScript_ResetAllMapFlags);
     StringCopy(gSaveBlock1Ptr->rivalName, rivalName);
     ResetTrainerTowerResults();
+#ifdef MEW_LAB
+    StringCopy(gSaveBlock2Ptr->playerName, sMewLabName);
+    gSaveBlock2Ptr->optionsTextSpeed = OPTIONS_TEXT_SPEED_FAST;
+    gSaveBlock2Ptr->optionsButtonMode = OPTIONS_BUTTON_MODE_LR;
+    FlagSet(FLAG_SYS_POKEDEX_GET);
+    FlagSet(FLAG_SYS_POKEMON_GET);
+    FlagSet(FLAG_SYS_GAME_CLEAR);
+    FlagSet(FLAG_BADGE05_GET);
+    FlagSet(FLAG_BADGE04_GET);
+    CreateMon(&gPlayerParty[0], SPECIES_PIKACHU, 35, 25, FALSE, 0, OT_ID_PLAYER_ID, 0);
+    gPlayerPartyCount = 1;
+    SetMonMoveSlot(&gPlayerParty[0], MOVE_THUNDERBOLT, 0);
+    SetMonMoveSlot(&gPlayerParty[0], MOVE_STRENGTH, 1);
+    AddBagItem(ITEM_POKE_FLUTE, 1);
+    AddBagItem(ITEM_ULTRA_BALL, 30);
+#endif
 }
 
 static void ResetMiniGamesResults(void)
