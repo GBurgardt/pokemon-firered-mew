@@ -539,7 +539,19 @@ static void Task_MewScene(u8 taskId)
     if(t>=180 && t<280)
     {
         truck->x2=Sin(t*35,2);truck->y2=0;
-        OrbitSparks(sScene->truckX,sScene->truckY+12,(t-180)/3+4,t*4);
+    }
+    if(t>=180 && t<390)
+    {
+        u8 i;
+        SparksOff();
+        // Sparse glints underneath the chassis, not an opaque ring over it.
+        for(i=0;i<6;i++)
+        {
+            struct Sprite *sp=&gSprites[sScene->sparks[i]];
+            sp->invisible=(t+i*9)%40>10;
+            sp->x=sScene->truckX-18+i*7+Sin(t*2+i*37,2);
+            sp->y=sScene->truckY+25+Sin(t*3+i*41,5);
+        }
     }
     if(t==240){mew->invisible=FALSE;PlaySE(SE_M_PSYBEAM);}
     if(t>=240 && t<420)
