@@ -87,12 +87,23 @@ static const struct SpriteTemplate sPartnerTemplate = {
 static const struct SpriteTemplate sWaveTemplate = {
     TAG_WAVE, TAG_MEW, &sOamWave, sAnims, NULL, sWaveAffine, SpriteCallbackDummy
 };
-static const u16 sSparkPal[] = {0, RGB(31,31,31), RGB(31,23,5), RGB(31,10,24), RGB(8,8,18), RGB(18,8,27), RGB(12,27,31),0,0,0,0,0,0,0,0,0};
+static const u16 sSparkPal[] = {0, RGB(31,31,31), RGB(31,23,5), RGB(31,3,4), RGB(3,3,5), RGB(18,8,27), RGB(8,17,31),0,0,0,0,0,0,0,0,0};
 static const u8 sSparkTiles[] = {
     0,0,0,0, 0,0x10,0,0, 0,0x11,1,0, 0x10,0x11,0x11,1,
     0,0x11,1,0, 0,0x10,0,0, 0,0,0,0, 0,0,0,0,
     0,0x44,0x44,0, 0x40,0x33,0x33,4, 0x34,0x33,0x33,0x43, 0x44,0x44,0x44,0x44,
-    0x14,0x11,0x11,0x41, 0x14,0x11,0x11,0x41, 0x40,0x11,0x11,4, 0,0x44,0x44,0
+    0x14,0x14,0x41,0x41, 0x14,0x11,0x11,0x41, 0x40,0x11,0x11,4, 0,0x44,0x44,0,
+    0,0x44,0x44,0, 0x40,0x22,0x22,4, 0x24,0x42,0x24,0x42, 0x44,0x44,0x44,0x44,
+    0x14,0x14,0x41,0x41, 0x14,0x11,0x11,0x41, 0x40,0x11,0x11,4, 0,0x44,0x44,0,
+    0,0x44,0x44,0, 0x40,0x36,0x63,4, 0x64,0x36,0x63,0x46, 0x44,0x44,0x44,0x44,
+    0x14,0x14,0x41,0x41, 0x14,0x11,0x11,0x41, 0x40,0x11,0x11,4, 0,0x44,0x44,0
+};
+static const union AnimCmd sBallStill[] = {ANIMCMD_FRAME(1,1),ANIMCMD_END};
+static const union AnimCmd sUltraStill[] = {ANIMCMD_FRAME(2,1),ANIMCMD_END};
+static const union AnimCmd sGreatStill[] = {ANIMCMD_FRAME(3,1),ANIMCMD_END};
+static const union AnimCmd *const sBallAnims[] = {sBallStill,sUltraStill,sGreatStill};
+static const struct SpriteTemplate sBallTemplate = {
+    TAG_SPARK,TAG_SPARK,&sOam8,sBallAnims,NULL,gDummySpriteAffineAnimTable,SpriteCallbackDummy
 };
 static const struct SpriteTemplate sSparkTemplate = {
     TAG_SPARK, TAG_SPARK, &sOam8, sAnims, NULL, gDummySpriteAffineAnimTable, SpriteCallbackDummy
@@ -196,7 +207,7 @@ void MewEncounter_Start(void)
     sheets[0]=(struct SpriteSheet){sTruckTiles,2048,TAG_TRUCK};
     sheets[1]=(struct SpriteSheet){sMewFrames,2048,TAG_MEW};
     sheets[2]=(struct SpriteSheet){sMewFrames+24*2048,2048,TAG_WAVE};
-    sheets[3]=(struct SpriteSheet){sSparkTiles,64,TAG_SPARK};
+    sheets[3]=(struct SpriteSheet){sSparkTiles,sizeof(sSparkTiles),TAG_SPARK};
     sheets[4]=(struct SpriteSheet){NULL,0,0};
     pals[0]=(struct SpritePalette){sTruckPal,TAG_TRUCK};
     pals[1]=(struct SpritePalette){sMewPal,TAG_MEW};
@@ -274,8 +285,7 @@ static void BeginDuel(void)
     }
     gSprites[sScene->partner].oam.priority=0;
     gSprites[sScene->partner].invisible=TRUE;
-    sScene->ball=CreateSprite(&sSparkTemplate,120,78,0);
-    gSprites[sScene->ball].oam.tileNum++;
+    sScene->ball=CreateSprite(&sBallTemplate,120,124,0);
     PlaySE(SE_BALL_THROW);
     sScene->hud=AddWindow(&sHud);
     sScene->controls=AddWindow(&sControlsWindow);
@@ -336,8 +346,8 @@ static void StartCapture(void)
         while(sScene->shakes<4 && Random()<odds)sScene->shakes++;
     }
     sScene->captureSuccess=sScene->shakes==4;
-    sScene->ball=CreateSprite(&sSparkTemplate,sScene->px,sScene->py,0);
-    gSprites[sScene->ball].oam.tileNum++;
+    sScene->ball=CreateSprite(&sBallTemplate,125,124,0);
+    StartSpriteAnim(&gSprites[sScene->ball],item==ITEM_ULTRA_BALL?1:item==ITEM_GREAT_BALL?2:0);
     SetMonData(&sScene->enemy,MON_DATA_POKEBALL,&item);
     SetMonData(&sScene->enemy,MON_DATA_HP,&sScene->enemyHp);
     PlaySE(SE_BALL_THROW);
@@ -487,7 +497,7 @@ static void Task_MewScene(u8 taskId)
     if(sScene->state==3)
     {
         struct Sprite *ball=&gSprites[sScene->ball];
-        if(t<40){ball->x=120+(sScene->px-120)*t/40;ball->y=132+(sScene->py-132)*t/40-Sin(t*128/40,18);}
+        if(t<40){ball->x=125+(sScene->px-125)*t/40;ball->y=124+(sScene->py-124)*t/40-Sin(t*128/40,18);}
         if(t==40){ball->invisible=TRUE;gSprites[sScene->partner].invisible=FALSE;PlaySE(SE_BALL_OPEN);}
         if(t>=40 && t<70)OrbitSparks(sScene->px,sScene->py,t-36,t*8);
         if(t==70){SparksOff();PlayCry_Normal(GetMonData(&gPlayerParty[sScene->lead],MON_DATA_SPECIES,NULL),-40);}
@@ -497,7 +507,7 @@ static void Task_MewScene(u8 taskId)
     if(sScene->state==2)
     {
         struct Sprite *ball=&gSprites[sScene->ball];
-        if(t<40){ball->x=sScene->px+(sScene->mx-sScene->px)*t/40;ball->y=sScene->py+(sScene->my-sScene->py)*t/40-Sin(t*128/40,24);}
+        if(t<40){ball->x=125+(sScene->mx-125)*t/40;ball->y=124+(sScene->my-124)*t/40-Sin(t*128/40,24);}
         if(t==40){mew->invisible=TRUE;PlaySE(SE_BALL_OPEN);}
         if(t>40){ball->x=sScene->mx;ball->y=sScene->my+12;ball->x2=(t%45<12)?Sin(t*24,2):0;}
         if(t==90 || t==135 || t==180)PlaySE(SE_BALL_TRAY_ENTER);
