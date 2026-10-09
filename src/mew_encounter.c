@@ -33,6 +33,7 @@
 #define TAG_MEW 12001
 #define TAG_WAVE 12002
 #define TAG_SPARK 12003
+#define TAG_PARTNER 12004
 #define FLAG_MEW_TRUCK_CAUGHT FLAG_UNUSED_0x4AF
 #define SPARKS 20
 // GBA trig helpers index a 256-entry table; unbounded animation time must wrap.
@@ -49,7 +50,7 @@ struct MewScene
     s16 truckX, truckY, mx, my, px, py, aimX, aimY;
     s16 shotX, shotY, shotDX, shotDY;
     u8 truck, mew, wave, partner, ball, sparks[SPARKS], hud, controls, lead, moveSlot;
-    u8 projectile, captured, attackHit, mewFrame, waveFrame, shakes, captureSuccess;
+    u8 projectile, captured, attackHit, mewFrame, waveFrame, shakes, captureSuccess, pmdPartner;
     s16 redX, redY;
     struct Pokemon enemy;
 };
@@ -79,6 +80,9 @@ static const struct SpriteTemplate sTruckTemplate = {
 };
 static const struct SpriteTemplate sMewTemplate = {
     TAG_MEW, TAG_MEW, &sOam64, sAnims, NULL, gDummySpriteAffineAnimTable, SpriteCallbackDummy
+};
+static const struct SpriteTemplate sPartnerTemplate = {
+    TAG_PARTNER, TAG_PARTNER, &sOam64, sAnims, NULL, gDummySpriteAffineAnimTable, SpriteCallbackDummy
 };
 static const struct SpriteTemplate sWaveTemplate = {
     TAG_WAVE, TAG_MEW, &sOamWave, sAnims, NULL, sWaveAffine, SpriteCallbackDummy
@@ -255,8 +259,19 @@ static void BeginDuel(void)
         {sScene->move=move;sScene->moveSlot=i;break;}
     }
     species=GetMonData(&gPlayerParty[sScene->lead],MON_DATA_SPECIES,NULL);
-    LoadMonIconPalette(species);
-    sScene->partner=CreateMonIcon(species,SpriteCallbackDummy,sScene->px,sScene->py,0,0,FALSE);
+    sScene->pmdPartner=species==SPECIES_PIKACHU;
+    if(sScene->pmdPartner)
+    {
+        struct SpriteSheet sheet={sPartnerFrames,2048,TAG_PARTNER};
+        struct SpritePalette pal={sPartnerPal,TAG_PARTNER};
+        LoadSpriteSheet(&sheet);LoadSpritePalette(&pal);
+        sScene->partner=CreateSprite(&sPartnerTemplate,sScene->px,sScene->py,0);
+    }
+    else
+    {
+        LoadMonIconPalette(species);
+        sScene->partner=CreateMonIcon(species,SpriteCallbackDummy,sScene->px,sScene->py,0,0,FALSE);
+    }
     gSprites[sScene->partner].oam.priority=0;
     gSprites[sScene->partner].invisible=TRUE;
     sScene->ball=CreateSprite(&sSparkTemplate,120,78,0);
@@ -343,11 +358,13 @@ static void Finish(u8 taskId, const u8 *message)
     if(sScene->partner<MAX_SPRITES)
     {
         u16 species=GetMonData(&gPlayerParty[sScene->lead],MON_DATA_SPECIES,NULL);
-        DestroyMonIcon(&gSprites[sScene->partner]);FreeMonIconPalette(species);
+        if(sScene->pmdPartner){DestroySprite(&gSprites[sScene->partner]);FreeSpriteTilesByTag(TAG_PARTNER);FreeSpritePaletteByTag(TAG_PARTNER);}
+        else {DestroyMonIcon(&gSprites[sScene->partner]);FreeMonIconPalette(species);}
     }
     FreeSpriteTilesByTag(TAG_TRUCK);FreeSpriteTilesByTag(TAG_MEW);FreeSpriteTilesByTag(TAG_WAVE);FreeSpriteTilesByTag(TAG_SPARK);
     FreeSpritePaletteByTag(TAG_TRUCK);FreeSpritePaletteByTag(TAG_MEW);FreeSpritePaletteByTag(TAG_SPARK);
     gSprites[gPlayerAvatar.spriteId].x2=sScene->redX;gSprites[gPlayerAvatar.spriteId].y2=sScene->redY;
+    StartSpriteAnim(&gSprites[gPlayerAvatar.spriteId],GetFaceDirectionAnimNum(DIR_NORTH));
     SetCameraPanning(0,0);InstallCameraPanAheadCallback();
     BlendPalettes(0xFFFFFFFF,0,RGB_BLACK);
     PlayNewMapMusic(sScene->originalMusic);
@@ -376,9 +393,15 @@ static void UpdateDuel(u8 taskId)
     if(ny<=78 || (nx>=105 && nx<=132)){sScene->px=nx;sScene->py=ny;}
     p->x=sScene->px;p->y=sScene->py;
     p->invisible=sScene->invuln && (t&4);
-    if(t%12==0)UpdateMonIconFrame(p);
+    if(sScene->pmdPartner && t%6==0)
+    {
+        u8 f=(sScene->mx<sScene->px?4:0)+(t/8)%4;
+        if(sScene->attackAge)f=(sScene->mx<sScene->px?15:8)+(sScene->attackAge/5)%7;
+        RequestSpriteCopy(sPartnerFrames+f*2048,(u8*)OBJ_VRAM0+p->oam.tileNum*32,2048);
+    }
+    else if(!sScene->pmdPartner && t%12==0)UpdateMonIconFrame(p);
     m->x=sScene->mx;m->y=sScene->my+Sin(t*3,3);
-    if(t%360<300 && t%6==0)SetFrame(sScene->mew,12+(t/6)%12);
+    if(t%360<300 && t%6==0)SetFrame(sScene->mew,(sScene->mx<sScene->px?48:12)+(t/8)%6);
     if(JOY_NEW(B_BUTTON)){StartCapture();return;}
     if(JOY_NEW(A_BUTTON) && !sScene->cooldown)
     {
@@ -464,7 +487,7 @@ static void Task_MewScene(u8 taskId)
     if(sScene->state==3)
     {
         struct Sprite *ball=&gSprites[sScene->ball];
-        if(t<40){ball->x=120+(sScene->px-120)*t/40;ball->y=78+(sScene->py-78)*t/40-Sin(t*128/40,18);}
+        if(t<40){ball->x=120+(sScene->px-120)*t/40;ball->y=132+(sScene->py-132)*t/40-Sin(t*128/40,18);}
         if(t==40){ball->invisible=TRUE;gSprites[sScene->partner].invisible=FALSE;PlaySE(SE_BALL_OPEN);}
         if(t>=40 && t<70)OrbitSparks(sScene->px,sScene->py,t-36,t*8);
         if(t==70){SparksOff();PlayCry_Normal(GetMonData(&gPlayerParty[sScene->lead],MON_DATA_SPECIES,NULL),-40);}
@@ -487,12 +510,21 @@ static void Task_MewScene(u8 taskId)
                 FlagSet(FLAG_MEW_TRUCK_CAUGHT);
                 GetSetPokedexFlag(SpeciesToNationalPokedexNum(SPECIES_MEW),FLAG_SET_CAUGHT);
                 PlayFanfare(MUS_LEVEL_UP);sScene->captured=TRUE;
+                gSprites[sScene->partner].invisible=TRUE;
+                StartSpriteAnim(&gSprites[gPlayerAvatar.spriteId],GetMoveDirectionAnimNum(DIR_NORTH));
+                gSprites[gPlayerAvatar.spriteId].animPaused=FALSE;
             }
             else
             {
                 DestroySprite(ball);sScene->ball=MAX_SPRITES;mew->invisible=FALSE;
                 sScene->state=1;sScene->frame=0;sScene->enemyCooldown=120;
             }
+        }
+        if(t>=225 && t<=300 && sScene->captured)
+        {
+            gSprites[gPlayerAvatar.spriteId].y2=sScene->redY+54*(300-t)/75;
+            if(t<245)OrbitSparks(sScene->px,sScene->py,245-t,t*8);
+            else SparksOff();
         }
         if(t>300 && sScene->captured)Finish(taskId,sCaught);
         return;
@@ -506,17 +538,19 @@ static void Task_MewScene(u8 taskId)
     }
     if(t>=180 && t<280)
     {
-        truck->x2=Sin(t*35,1);truck->y2=-(s16)(t-180)/5;
+        truck->x2=Sin(t*35,2);truck->y2=0;
         OrbitSparks(sScene->truckX,sScene->truckY+12,(t-180)/3+4,t*4);
     }
     if(t==240){mew->invisible=FALSE;PlaySE(SE_M_PSYBEAM);}
     if(t>=240 && t<420)
     {
-        u8 frame=(t-240)/15;
-        if(frame>11)frame=11;
+        u8 frame;
+        if(t<300)frame=47-(t-240)/5;
+        else if(t<360)frame=(t-300)/10;
+        else frame=6+(t-360)/10;
         if(t%5==0)SetFrame(sScene->mew,frame);
-        mew->y=sScene->truckY+18-(s16)(t-240)/8;
-        truck->y2=-20+Sin(t,2);
+        mew->y=sScene->truckY+40-(s16)(t-240)/7;
+        truck->x2=t<330?Sin(t*31,1):0;truck->y2=0;
     }
     if(t==390){PlayCry_Normal(SPECIES_MEW,0);PlayNewMapMusic(MUS_ENCOUNTER_DEOXYS);StartSpriteAffineAnim(wave,0);}
     if(t>=390 && t<462)
@@ -529,19 +563,29 @@ static void Task_MewScene(u8 taskId)
     if(t==462){wave->invisible=TRUE;SparksOff();SetCameraPanning(0,0);}
     if(t>=420 && t<510)
     {
-        mew->x=sScene->truckX+Cos((t-420)*2,35);
-        mew->y=sScene->truckY+Sin((t-420)*2,20)-14;
+        mew->x=sScene->truckX+Sin((t-420)*128/90,35);
+        mew->y=sScene->truckY-6+Cos((t-420)*128/90,20);
         if(t%6==0)SetFrame(sScene->mew,12+(t/6)%12);
-        if(t<500)truck->y2=-20+(s16)(t-420)/4;
-        else truck->y2=0;
+        truck->x2=0;truck->y2=0;
     }
-    if(t==510){SetTruckTiles(TRUE);truck->invisible=TRUE;FreeSpritePaletteByTag(TAG_TRUCK);PlaySE(SE_M_STRENGTH);}
+    if(t==510)
+    {
+        SetTruckTiles(TRUE);truck->invisible=TRUE;FreeSpritePaletteByTag(TAG_TRUCK);
+        StartSpriteAnim(&gSprites[gPlayerAvatar.spriteId],GetMoveDirectionAnimNum(DIR_SOUTH));
+        gSprites[gPlayerAvatar.spriteId].animPaused=FALSE;
+    }
     if(t>=510 && t<600)
     {
+        gSprites[gPlayerAvatar.spriteId].y2=sScene->redY+54*(t-510)/90;
         // Settle beside the trainer, then cross the dock into the encounter.
-        mew->x=sScene->truckX+35+(184-sScene->truckX-35)*(t-510)/90;
-        mew->y=sScene->truckY-14+(72-sScene->truckY+14)*(t-510)/90+Sin(t*4,2);
+        mew->x=sScene->truckX+(184-sScene->truckX)*(t-510)/90;
+        mew->y=sScene->truckY-26+(72-sScene->truckY+26)*(t-510)/90+Sin(t*4,2);
         if(t%6==0)SetFrame(sScene->mew,12+(t/6)%12);
     }
-    if(t==600){BlendPalettes(0xFFFFFFFF,0,RGB_BLACK);BeginDuel();}
+    if(t==600)
+    {
+        gSprites[gPlayerAvatar.spriteId].y2=sScene->redY+54;
+        StartSpriteAnim(&gSprites[gPlayerAvatar.spriteId],GetFaceDirectionAnimNum(DIR_NORTH));
+        BlendPalettes(0xFFFFFFFF,0,RGB_BLACK);BeginDuel();
+    }
 }
